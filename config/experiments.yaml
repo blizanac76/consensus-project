@@ -1,0 +1,28 @@
+# Example experiment configurations
+experiments:
+  - name: "topology_comparison"
+    N: 50
+    protocols: ["metropolis"]
+    graph_types:
+      - ring
+      - erdos_renyi
+      - watts_strogatz
+      - barabasi_albert
+    repeats: 5
+    alpha: 0.5
+    noise_std: 0.0
+    p_drop: 0.0
+    max_steps: 1000
+    tol: 1e-3
+
+  - name: "protocol_comparison"
+    N: 50
+    protocols: ["metropolis", "simple_avg", "gossip"]
+    graph_types:
+      - erdos_renyi
+    repeats: 5
+    alpha: 0.5
+    noise_std: 0.0
+    p_drop: 0.0
+    max_steps: 1000
+    tol: 1e-3
