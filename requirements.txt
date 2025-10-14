@@ -1,0 +1,6 @@
+mesa>=1.2
+networkx>=2.8
+numpy>=1.24
+pandas>=1.5
+matplotlib>=3.6
+pyyaml>=6.0
