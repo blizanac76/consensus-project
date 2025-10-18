@@ -27,9 +27,18 @@ class ConsensusModel(Model):
         # Graph creation
         if graph_params is None:
             graph_params = {}
-        if graph_type == 'erdos_renyi':
+        
+        elif graph_type == 'erdos_renyi':
             p = graph_params.get('p', 0.1)
             self.G = nx.erdos_renyi_graph(N, p, seed=seed)
+             # Ensure connectedness
+            tries = 0
+            while not nx.is_connected(self.G) and tries < 10:
+                tries += 1
+                self.G = nx.erdos_renyi_graph(N, p, seed=random.randint(0, 9999))
+
+
+
         elif graph_type == 'ring':
             self.G = nx.cycle_graph(N)
         elif graph_type == 'watts_strogatz':
@@ -134,11 +143,19 @@ class ConsensusModel(Model):
             self.step_count += 1
 
         # collect stats
-        vals = [a.value for a in self.node_agent_map.values()]
+        vals = np.array([a.value for a in self.node_agent_map.values()])  # <-- convert to np.array
         mean = float(np.mean(vals))
         var = float(np.var(vals))
-        rng = float(max(vals) - min(vals))
-        self.history.append({'step': self.step_count, 'mean': mean, 'var': var, 'range': rng})
+        rng = float(np.max(vals) - np.min(vals))
+        l2_error = float(np.sum((vals - mean) ** 2))  # now this works fine
+
+        self.history.append({
+            'step': self.step_count,
+            'mean': mean,
+            'var': var,
+            'range': rng,
+            'l2_error': l2_error
+        })
 
     def run_until(self, max_steps=1000, tol_range=1e-4):
         for _ in range(max_steps):

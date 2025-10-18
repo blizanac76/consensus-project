@@ -3,6 +3,8 @@ import os
 from src.experiments.runner import sweep_and_save
 from src.utils.io_utils import ensure_dir
 from src.viz.plotting import plot_bar_convergence
+from src.viz.plots import generate_all_plots
+
 
 OUT_CSV = 'data/experiment_baseline.csv'
 VIS_DIR = 'visualizations'
@@ -24,3 +26,4 @@ if __name__ == "__main__":
     ensure_dir(VIS_DIR)
     plot_bar_convergence(df, os.path.join(VIS_DIR, 'convergence_by_topology.png'))
     print("Done. CSV saved to:", OUT_CSV)
+    generate_all_plots(OUT_CSV)

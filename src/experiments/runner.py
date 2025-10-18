@@ -15,6 +15,8 @@ def single_run(config):
     keys: N, graph_type, graph_params, protocol, alpha, noise_std, p_drop, seed, max_steps, tol
     Returns a dict with metrics.
     """
+
+    start_time = time.time()
     m = ConsensusModel(
         N=config['N'],
         graph_type=config['graph_type'],
@@ -28,22 +30,28 @@ def single_run(config):
     # compute spectral gap for analysis
     gap = spectral_gap(m.G)
     m.run_until(max_steps=config.get('max_steps', 1000), tol_range=config.get('tol', 1e-4))
+    elapsed = time.time() - start_time
     last = m.history[-1]
+    converged = m.history[-1]['range'] < config.get('tol', 1e-4)
     return {
-        'N': config['N'],
-        'graph_type': config['graph_type'],
-        'graph_params': config.get('graph_params', {}),
-        'protocol': config.get('protocol', 'metropolis'),
-        'alpha': config.get('alpha', 0.5),
-        'noise_std': config.get('noise_std', 0.0),
-        'p_drop': config.get('p_drop', 0.0),
-        'seed': config.get('seed', None),
-        'spectral_gap': gap,
-        'convergence_step': m.step_count,
-        'final_var': last['var'],
-        'final_range': last['range'],
-        'final_mean': last['mean']
-    }
+    'N': config['N'],
+    'graph_type': config['graph_type'],
+    'graph_params': config.get('graph_params', {}),
+    'protocol': config.get('protocol', 'metropolis'),
+    'alpha': config.get('alpha', 0.5),
+    'noise_std': config.get('noise_std', 0.0),
+    'p_drop': config.get('p_drop', 0.0),
+    'seed': config.get('seed', None),
+    'spectral_gap': gap,
+    'convergence_step': m.step_count,
+    'final_var': last['var'],
+    'final_range': last['range'],
+    'final_mean': last['mean'],
+    'final_l2_error': last.get('l2_error', np.nan),  # <--- add this safely
+    'min_l2_error': min(h['l2_error'] for h in m.history if 'l2_error' in h),  # <--- optional, global min
+    'elapsed_sec': elapsed,
+    'converged': converged
+}
 
 def sweep_and_save(output_csv, param_grid, repeats=5):
     """
