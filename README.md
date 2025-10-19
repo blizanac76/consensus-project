@@ -1,6 +1,5 @@
-# Multi-Agent Consensus Simulation (Mesa 3.x)
+# Multi-Agent Consensus Simulation 
 
-## Quick start
 ```bash
 pip install -r requirements.txt
 python run_experiment.py
