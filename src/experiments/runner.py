@@ -11,12 +11,11 @@ from src.utils.io_utils import save_experiment_results, ensure_dir
 
 def single_run(config):
     """
-    Run a single trial described by config dict:
-    keys: N, graph_type, graph_params, protocol, alpha, noise_std, p_drop, seed, max_steps, tol
-    Returns a dict with metrics.
+    pokrece jednu simulaciju sa datim parametrima (config je dict)
+    vraca metrike iz simulacije kao dict
     """
 
-    start_time = time.time()
+    start_time = time.time()  # vreme pocetka pokretanja
     m = ConsensusModel(
         N=config['N'],
         graph_type=config['graph_type'],
@@ -27,12 +26,17 @@ def single_run(config):
         p_drop=config.get('p_drop', 0.0),
         seed=config.get('seed', None)
     )
-    # compute spectral gap for analysis
+     # racuna se spektralni zazor/gap grafa (lambda_2)
     gap = spectral_gap(m.G)
+    # pokrece se simulacija dok ne konvergira ili dok ne stigne do max_steps
     m.run_until(max_steps=config.get('max_steps', 1000), tol_range=config.get('tol', 1e-4))
     elapsed = time.time() - start_time
+     # uzima se poslednji zapis 
     last = m.history[-1]
+     # da li je model konvergirao
     converged = m.history[-1]['range'] < config.get('tol', 1e-4)
+
+    # formira se dict sa metrikama
     return {
     'N': config['N'],
     'graph_type': config['graph_type'],
@@ -55,17 +59,19 @@ def single_run(config):
 
 def sweep_and_save(output_csv, param_grid, repeats=5):
     """
-    param_grid: list of dicts with config template (seed will be overwritten)
-    repeats: number of seeds per template
+    pokrece vise simulacija razliciti grafovi i protokoli
+    param_grid: lista dict-ova sa kombinacijama parametara
+    repeats: koliko puta se ponavlja svaka konfiguracija (vise random seed)
     """
-    results = []
-    ensure_dir(os.path.dirname(output_csv))
+    results = []  # lista svih rezultata
+    ensure_dir(os.path.dirname(output_csv))  # pravi folder ako ne postoji za ispis metrike u csv
+    # iterira kroz sve konfiguracije (param_grid), prikazuje progres bar
     for template in tqdm(param_grid, desc="Templates"):
-        for r in range(repeats):
-            cfg = dict(template)
-            cfg['seed'] = r
-            res = single_run(cfg)
-            results.append(res)
-    df = pd.DataFrame(results)
-    save_experiment_results(df, output_csv)
-    return df
+        for r in range(repeats):  
+            cfg = dict(template)  # pravi kopiju konfiguracije
+            cfg['seed'] = r  # postavlja random seed
+            res = single_run(cfg)  
+            results.append(res)  # dodaje rezultat
+    df = pd.DataFrame(results)  # pretvara rezultate u pandas tabelu
+    save_experiment_results(df, output_csv)  # cuva kao CSV
+    return df  # vraca tabelu rezultata

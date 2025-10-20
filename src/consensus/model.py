@@ -7,8 +7,9 @@ from .agent import ConsensusAgent
 
 class ConsensusModel(Model):
     """
-    Consensus model supporting 'metropolis', 'simple_avg' and 'gossip' protocols.
-    For gossip we perform a single random-edge averaging per step (asynchronous).
+    glavni model za simulaciju konsenzusa.
+    podrzava protokole metropolis simple_avg gossip
+    Gossip koristi asinhroni update preko random  edge
     """
     def __init__(self, N=50, graph_type='erdos_renyi', graph_params=None,
                  alpha=0.5, protocol='metropolis', noise_std=0.0,
@@ -18,20 +19,21 @@ class ConsensusModel(Model):
             random.seed(seed)
             np.random.seed(seed)
 
+        # parametri za simulaciju
         self.num_agents = N
-        self.alpha = alpha
+        self.alpha = alpha # korak u update formulama
         self.protocol = protocol
         self.noise_std = noise_std
-        self.p_drop = p_drop
+        self.p_drop = p_drop # VRV DA SE PORUKA ZAGUBI
 
-        # Graph creation
         if graph_params is None:
             graph_params = {}
         
         elif graph_type == 'erdos_renyi':
+            ## e-r graf G(n, p) --- nasumican graf sa n cvorova, svaka ivica/veza postoji sa verovatnocom p
             p = graph_params.get('p', 0.1)
             self.G = nx.erdos_renyi_graph(N, p, seed=seed)
-             # Ensure connectedness
+             # osiguraj da je graf povezan (max 10 pokusaja)
             tries = 0
             while not nx.is_connected(self.G) and tries < 10:
                 tries += 1
@@ -40,33 +42,46 @@ class ConsensusModel(Model):
 
 
         elif graph_type == 'ring':
+            ## ring graf -- svaki cvor je povezan sa 2 suseda (levo i desno), formira ciklus
             self.G = nx.cycle_graph(N)
+
         elif graph_type == 'watts_strogatz':
+            # wtts–strogatz -- small-world graf
+            # pocetna topologija je ring sa k suseda; zatim se nasumično rewira svaka ivica sa verovatnoćom p
             k = graph_params.get('k', 4)
             p = graph_params.get('p', 0.1)
             self.G = nx.watts_strogatz_graph(N, k, p, seed=seed)
+
         elif graph_type == 'barabasi_albert':
-            m = graph_params.get('m', 2)
+            # barabasialbert - scale-free mreza sa preferencijalnim povezivanjem
+            m = graph_params.get('m', 2) # broj ivica koje svaki novi cvor dodaje
             self.G = nx.barabasi_albert_graph(N, m, seed=seed)
         else:
             raise ValueError("unknown graph_type")
 
-        # create agents: instantiate ConsensusAgent registers them in model.agents
+        #  ---------- KREIRANJE AGENATA ZA SVAKI CVOR GRAFA ------------ #
         self.node_agent_map = {}
         for node in self.G.nodes():
-            init = random.uniform(0, 1)
-            a = ConsensusAgent(self, node, init_value=init)
+            init = random.uniform(0, 1) # inicijalna vrednost iz uniformne raspodele 0 - 1
+            a = ConsensusAgent(self, node, init_value=init) # svaki agent zna svoj node_id
             self.node_agent_map[node] = a
 
-        # precompute Metropolis weights if needed
+        # ako se koristi Metropolis protokol, unapred se racuna matrica tezina W
         if self.protocol == 'metropolis':
             self.W = self.compute_metropolis_weights()
 
-        # history
+        # istorija kao niz za cuvanje statistike
         self.history = []
         self.step_count = 0
 
     def compute_metropolis_weights(self):
+        
+        """
+        racuna metropolis matricu tezina W:
+        w_ij = 1 / (1 + max(d_i, d_j)) za susede i i   j
+        w_ii = 1 - suma svih tezina ka susedima (da red sumira na 1)
+        """
+
         W = {i: {} for i in self.G.nodes()}
         for i in self.G.nodes():
             for j in self.G.neighbors(i):
@@ -78,25 +93,25 @@ class ConsensusModel(Model):
         return random.random() < self.p_drop
 
     def byzantine_value(self, receiver_id, sender_id):
-        # Example Byzantine strategy: fixed large bias
+        # neki veliki extrem, zarad simulacije moze 10
         return 10.0
 
     def gossip_step(self):
         """
-        Perform a single pairwise gossip update:
-        choose random edge (u,v) and set both endpoints to weighted average:
-        x_u <- x_u + alpha*(x_v - x_u)
-        x_v <- x_v + alpha*(x_u_old - x_v)
-        We apply updates immediately (asynchronous).
+        jedan asinhroni korak gossip protokola:
+        - bira se nasumicna ivica (u,v)
+        - oba agenta u i v update svoju vrednost kao u formuli:
+          x_i postaje x_i + alfa(x_j - x_i)
+        - moguca byzantine laznjak i gubitak poruke
         """
         if self.G.number_of_edges() == 0:
             return
         u, v = random.choice(list(self.G.edges()))
-        # simulate message drop individually for each direction
+        # simulacija dropanja poruke u oba smera
         u_val = self.node_agent_map[u].value
         v_val = self.node_agent_map[v].value
 
-        # Byzantine handling (they report manipulated value)
+         # bizantijski agenti šalju lažne vrednosti
         if self.node_agent_map[u].is_byzantine:
             reported_u = self.byzantine_value(v, u)
         else:
@@ -106,15 +121,14 @@ class ConsensusModel(Model):
         else:
             reported_v = v_val
 
-        # potential packet drops
+        # agent u update vrednost ako poruka nije izgubljena
         if self.try_drop_message():
-            # drop message from v->u: u sees nothing => u keeps its value
             new_u = u_val
         else:
             new_u = u_val + self.alpha * (reported_v - u_val)
             if self.noise_std > 0:
                 new_u += np.random.normal(0, self.noise_std)
-
+        # isto za agenta v
         if self.try_drop_message():
             new_v = v_val
         else:
@@ -122,32 +136,33 @@ class ConsensusModel(Model):
             if self.noise_std > 0:
                 new_v += np.random.normal(0, self.noise_std)
 
-        # commit immediately
+        # commit asinhroni, odmah
         self.node_agent_map[u].value = new_u
         self.node_agent_map[v].value = new_v
 
     def step(self):
         """
-        One simulation step. For synchronous protocols we call agent.step()/advance();
-        for gossip we call gossip_step (asynchronous).
+        jedan korak simulacije.
+        - ako je gossip: pokrece jedan edge update
+        - inace: svi agenti sinhrono racunaju (step) pa commituju (advance)
+        - belezi se statistika stanja nakon svakog koraka
         """
         if self.protocol == 'gossip':
             # gossip step - single edge update
             self.gossip_step()
-            # collect stats
             self.step_count += 1
         else:
-            # synchronous: compute next values then commit
+            # sihnroni: izracunaj sledecu vbrednost pa commituj
             self.agents.do("step")
             self.agents.do("advance")
             self.step_count += 1
 
-        # collect stats
+        # skupljanje podataka
         vals = np.array([a.value for a in self.node_agent_map.values()])  # <-- convert to np.array
-        mean = float(np.mean(vals))
-        var = float(np.var(vals))
-        rng = float(np.max(vals) - np.min(vals))
-        l2_error = float(np.sum((vals - mean) ** 2))  # now this works fine
+        mean = float(np.mean(vals)) #prosecna vr
+        var = float(np.var(vals))   #varijansa
+        rng = float(np.max(vals) - np.min(vals))    #range 
+        l2_error = float(np.sum((vals - mean) ** 2))  # l2 suma kvadrata odstupanja
 
         self.history.append({
             'step': self.step_count,
@@ -158,6 +173,10 @@ class ConsensusModel(Model):
         })
 
     def run_until(self, max_steps=1000, tol_range=1e-4):
+        """
+        pokrece model do konvergencije do tol_range vrednostti
+        ili do max_steps koraka. Vraca model i podatke
+        """
         for _ in range(max_steps):
             self.step()
             if self.history and self.history[-1]['range'] < tol_range:

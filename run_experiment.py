@@ -11,10 +11,10 @@ VIS_DIR = 'visualizations'
 
 param_grid = [
     # baseline for different topologies (metropolis)
-    {'N':50, 'graph_type':'ring', 'graph_params':{}, 'protocol':'metropolis', 'alpha':0.5, 'noise_std':0.0, 'p_drop':0.0, 'max_steps':1000, 'tol':1e-3},
+    {'N':50, 'graph_type':'ring', 'graph_params':{}, 'protocol':'metropolis', 'alpha':0.5, 'noise_std':0.0, 'p_drop':0.2, 'max_steps':1000, 'tol':1e-3},
     {'N':50, 'graph_type':'erdos_renyi', 'graph_params':{'p':0.08}, 'protocol':'metropolis', 'alpha':0.5, 'noise_std':0.0, 'p_drop':0.0, 'max_steps':1000, 'tol':1e-3},
     {'N':50, 'graph_type':'watts_strogatz', 'graph_params':{'k':4,'p':0.1}, 'protocol':'metropolis', 'alpha':0.5, 'noise_std':0.0, 'p_drop':0.0, 'max_steps':1000, 'tol':1e-3},
-    {'N':50, 'graph_type':'barabasi_albert', 'graph_params':{'m':2}, 'protocol':'metropolis', 'alpha':0.5, 'noise_std':0.0, 'p_drop':0.0, 'max_steps':1000, 'tol':1e-3},
+    {'N':50, 'graph_type':'barabasi_albert', 'graph_params':{'m':2}, 'protocol':'metropolis', 'alpha':0.5, 'noise_std':0.0, 'p_drop':0.2, 'max_steps':1000, 'tol':1e-3},
     # compare protocols on ER
     {'N':50, 'graph_type':'erdos_renyi', 'graph_params':{'p':0.08}, 'protocol':'simple_avg', 'alpha':0.5, 'noise_std':0.0, 'p_drop':0.0, 'max_steps':1000, 'tol':1e-3},
     {'N':50, 'graph_type':'erdos_renyi', 'graph_params':{'p':0.08}, 'protocol':'gossip', 'alpha':0.5, 'noise_std':0.0, 'p_drop':0.0, 'max_steps':5000, 'tol':1e-3},
