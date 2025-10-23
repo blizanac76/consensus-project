@@ -15,28 +15,25 @@ def single_run(config):
     vraca metrike iz simulacije kao dict
     """
 
-    start_time = time.time()  # vreme pocetka pokretanja
+    start_time = time.time()  # pocetak
     m = ConsensusModel(
         N=config['N'],
         graph_type=config['graph_type'],
         graph_params=config.get('graph_params', {}),
         alpha=config.get('alpha', 0.5),
+        byzantine_fraction=config.get('byzantine_fraction', 0.0),
         protocol=config.get('protocol', 'metropolis'),
         noise_std=config.get('noise_std', 0.0),
         p_drop=config.get('p_drop', 0.0),
         seed=config.get('seed', None)
     )
-     # racuna se spektralni zazor/gap grafa (lambda_2)
     gap = spectral_gap(m.G)
-    # pokrece se simulacija dok ne konvergira ili dok ne stigne do max_steps
     m.run_until(max_steps=config.get('max_steps', 1000), tol_range=config.get('tol', 1e-4))
     elapsed = time.time() - start_time
-     # uzima se poslednji zapis 
     last = m.history[-1]
      # da li je model konvergirao
     converged = m.history[-1]['range'] < config.get('tol', 1e-4)
 
-    # formira se dict sa metrikama
     return {
     'N': config['N'],
     'graph_type': config['graph_type'],
@@ -46,15 +43,17 @@ def single_run(config):
     'noise_std': config.get('noise_std', 0.0),
     'p_drop': config.get('p_drop', 0.0),
     'seed': config.get('seed', None),
+
     'spectral_gap': gap,
     'convergence_step': m.step_count,
     'final_var': last['var'],
     'final_range': last['range'],
     'final_mean': last['mean'],
-    'final_l2_error': last.get('l2_error', np.nan),  # <--- add this safely
-    'min_l2_error': min(h['l2_error'] for h in m.history if 'l2_error' in h),  # <--- optional, global min
+    'final_l2_error': last.get('l2_error', np.nan),  
+    'min_l2_error': min(h['l2_error'] for h in m.history if 'l2_error' in h), 
     'elapsed_sec': elapsed,
-    'converged': converged
+    'converged': converged,
+    'byzantine_fraction': config.get('byzantine_fraction', 0.01),
 }
 
 def sweep_and_save(output_csv, param_grid, repeats=5):
@@ -63,15 +62,15 @@ def sweep_and_save(output_csv, param_grid, repeats=5):
     param_grid: lista dict-ova sa kombinacijama parametara
     repeats: koliko puta se ponavlja svaka konfiguracija (vise random seed)
     """
-    results = []  # lista svih rezultata
-    ensure_dir(os.path.dirname(output_csv))  # pravi folder ako ne postoji za ispis metrike u csv
-    # iterira kroz sve konfiguracije (param_grid), prikazuje progres bar
+    results = [] 
+    ensure_dir(os.path.dirname(output_csv))  
+    
     for template in tqdm(param_grid, desc="Templates"):
         for r in range(repeats):  
-            cfg = dict(template)  # pravi kopiju konfiguracije
-            cfg['seed'] = r  # postavlja random seed
+            cfg = dict(template)  
+            cfg['seed'] = r 
             res = single_run(cfg)  
-            results.append(res)  # dodaje rezultat
+            results.append(res)  
     df = pd.DataFrame(results)  # pretvara rezultate u pandas tabelu
     save_experiment_results(df, output_csv)  # cuva kao CSV
-    return df  # vraca tabelu rezultata
+    return df  

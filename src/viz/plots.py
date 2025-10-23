@@ -9,9 +9,6 @@ from src.utils.io_utils import ensure_dir
 
 
 def plot_convergence_by_topology(df, out_dir):
-    """
-    Compare average convergence step vs. topology (per protocol).
-    """
     ensure_dir(out_dir)
     plt.figure(figsize=(8, 5))
     sns.barplot(
@@ -34,17 +31,12 @@ def plot_convergence_by_topology(df, out_dir):
 
 
 def plot_error_decay(csv_path, out_dir, graph_type="erdos_renyi", protocol="metropolis"):
-    """
-    Plot L2 error decay over steps for one example run (shows convergence dynamics).
-    """
     from src.consensus.model import ConsensusModel
 
     ensure_dir(out_dir)
-    # Load config from CSV row
     df = pd.read_csv(csv_path)
     row = df[(df["graph_type"] == graph_type) & (df["protocol"] == protocol)].iloc[0]
 
-    # Re-run one model to collect detailed history
     m = ConsensusModel(
         N=row.N,
         graph_type=row.graph_type,
@@ -73,9 +65,7 @@ def plot_error_decay(csv_path, out_dir, graph_type="erdos_renyi", protocol="metr
 
 
 def plot_runtime_vs_topology(df, out_dir):
-    """
-    Compare runtime across graph types and protocols.
-    """
+   
     ensure_dir(out_dir)
     plt.figure(figsize=(8, 5))
     sns.barplot(
@@ -98,10 +88,7 @@ def plot_runtime_vs_topology(df, out_dir):
 
 
 def plot_correlation(df, out_dir):
-    """
-    Scatter plot: spectral gap vs convergence steps.
-    Demonstrates relation between connectivity and convergence speed.
-    """
+    
     ensure_dir(out_dir)
     plt.figure(figsize=(6, 5))
     sns.scatterplot(
@@ -123,20 +110,16 @@ def plot_correlation(df, out_dir):
 
 
 def generate_all_plots(csv_path, out_dir="visualizations/summary"):
-    """
-    Generate all key plots from results CSV.
-    """
+    
     df = pd.read_csv(csv_path)
     ensure_dir(out_dir)
 
-    # Drop weird rows with missing values
     df = df.dropna(subset=["spectral_gap", "convergence_step"])
 
     plot_convergence_by_topology(df, out_dir)
     plot_runtime_vs_topology(df, out_dir)
     plot_correlation(df, out_dir)
 
-    # Create detailed L2 error decay example
     plot_error_decay(csv_path, out_dir, graph_type="erdos_renyi", protocol="metropolis")
 
-    print("\n✅ All plots generated in:", out_dir)
+    print("\n all plots generated in:", out_dir)

@@ -9,22 +9,16 @@ import pandas as pd
 
 
 class ConsensusAgent(Agent):
-    """
-    Agent that participates in consensus. Each agent keeps the graph node id
-    it corresponds to in self.node_id so we can map graph neighbors to agents.
-    """
 
     def __init__(self, model, node_id, init_value=0.0):
-        # Mesa 3.x: unique_id is automatically assigned; pass model only
         super().__init__(model)
-        self.node_id = node_id          # graph node id (so neighbor lookups work)
+        self.node_id = node_id       
         self.value = float(init_value)
         self.next_value = float(init_value)
         self.is_stubborn = False
         self.is_byzantine = False
 
     def step(self):
-        # Byzantine/stubborn behavior
         if self.is_stubborn:
             self.next_value = self.value
             return
@@ -35,7 +29,6 @@ class ConsensusAgent(Agent):
             return
 
         if self.model.protocol == 'simple_avg':
-            # simple neighbor average (no self-weight)
             observed = []
             for j in nbrs:
                 if self.model.try_drop_message():
@@ -51,7 +44,6 @@ class ConsensusAgent(Agent):
                 self.next_value = self.value + self.model.alpha * (avg - self.value)
 
         elif self.model.protocol == 'metropolis':
-            # weighted update using precomputed W rows (W keyed by graph node ids)
             row = self.model.W[self.node_id]
             s = 0.0
             for j, w in row.items():
@@ -59,7 +51,6 @@ class ConsensusAgent(Agent):
                     s += w * self.value
                 else:
                     if self.model.try_drop_message():
-                        # treat dropped message as missing --> no contribution
                         continue
                     v = self.model.node_agent_map[j].value
                     if self.model.node_agent_map[j].is_byzantine:
@@ -67,12 +58,10 @@ class ConsensusAgent(Agent):
                     s += w * v
             self.next_value = s
 
-        # add measurement noise if configured
         if self.model.noise_std > 0:
             self.next_value += np.random.normal(0, self.model.noise_std)
 
     def advance(self):
-        # commit the computed next_value
         self.value = self.next_value
 
 
@@ -84,10 +73,8 @@ class ConsensusModel(Model):
     def __init__(self, N=50, graph_type='erdos_renyi', graph_params=None,
                  alpha=0.5, protocol='metropolis', noise_std=0.0,
                  p_drop=0.0, seed=None):
-        # call super with seed so Mesa internal RNG and bookkeeping is set
         super().__init__(seed=seed)
 
-        # keep deterministic numpy/python RNGs if seed provided
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
@@ -98,7 +85,6 @@ class ConsensusModel(Model):
         self.noise_std = noise_std
         self.p_drop = p_drop
 
-        # build graph
         if graph_params is None:
             graph_params = {}
 
@@ -117,20 +103,16 @@ class ConsensusModel(Model):
         else:
             raise ValueError("unknown graph_type")
 
-        # create agents and maintain mapping from graph node -> agent
         self.node_agent_map = {}
         for node in self.G.nodes():
             init = random.uniform(0, 1)
             a = ConsensusAgent(self, node, init_value=init)
-            # Agents are automatically tracked by Mesa in model.agents
             self.node_agent_map[node] = a
 
-        # prepare Metropolis weights if needed (keys are graph node ids)
         if self.protocol == 'metropolis':
             self.W = self.compute_metropolis_weights()
 
-        # stats/history
-        self.history = []          # list of dicts: step, mean, var, range
+        self.history = []          
         self.step_count = 0
 
     def compute_metropolis_weights(self):
@@ -145,7 +127,6 @@ class ConsensusModel(Model):
         return random.random() < self.p_drop
 
     def byzantine_value(self, receiver_id, sender_id):
-        # simple Byzantine strategy: report a large biased value
         return 10.0
 
     def step(self):
@@ -155,13 +136,11 @@ class ConsensusModel(Model):
           2) call all agents' advance() (commit next_value)
         Then collect statistics.
         """
-        # simultaneous behavior: compute next_value for everyone
-        # Note: Mesa 3.x replaces schedulers with AgentSet methods
+       
         self.agents.do("step")
         # then commit/advance
         self.agents.do("advance")
 
-        # update counters & stats
         self.step_count += 1
         vals = [a.value for a in self.node_agent_map.values()]
         mean = float(np.mean(vals))
@@ -178,7 +157,6 @@ class ConsensusModel(Model):
 
 
 if __name__ == "__main__":
-    # quick demo run
     m = ConsensusModel(N=50, graph_type='erdos_renyi', graph_params={'p': 0.08},
                        alpha=0.5, protocol='metropolis', noise_std=0.0,
                        p_drop=0.0, seed=42)
@@ -187,7 +165,6 @@ if __name__ == "__main__":
     df = pd.DataFrame(m.history)
     print(df.tail())
 
-    # plot mean and range
     fig, ax1 = plt.subplots()
     ax1.plot(df['step'], df['mean'], label='mean')
     ax1.set_xlabel('step')
