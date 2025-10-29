@@ -1,4 +1,4 @@
-# Multi-Agent Consensus Simulation 
+# Consensus Simulation 
 
 ```bash
 pip install -r requirements.txt
